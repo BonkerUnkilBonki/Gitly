@@ -464,6 +464,13 @@ public class MainActivity extends Activity {
                 + new org.json.JSONArray(errors).toString() + ")";
     }
 
+    /** True when the scanned upload contains a file at the given repo-relative path. */
+    private static boolean containsPath(Scan sc, String dir, String path) {
+        String prefix = dir == null || dir.isEmpty() ? "" : dir + "/";
+        for (String p : sc.paths) if ((prefix + p).equals(path)) return true;
+        return false;
+    }
+
     /** Uploads a scanned set of files as ONE commit via the Git Data API,
      *  streaming every file. Files that fail are reported individually —
      *  one bad file no longer aborts the rest of the upload. */
@@ -477,15 +484,29 @@ public class MainActivity extends Activity {
             String branch = repoInfo.optString("default_branch", "");
             if (branch == null || branch.isEmpty()) branch = "main";
             String parentSha = null, baseTree = null;
+            boolean bootstrapped = false;
             try {
                 org.json.JSONObject ref = gh(token, "GET", "https://api.github.com/repos/" + owner + "/" + repo
                         + "/git/ref/heads/" + branch, null);
                 parentSha = ref.getJSONObject("object").getString("sha");
-                org.json.JSONObject pc = gh(token, "GET", "https://api.github.com/repos/" + owner + "/" + repo
-                        + "/git/commits/" + parentSha, null);
-                org.json.JSONObject t = pc.optJSONObject("tree");
-                if (t != null) baseTree = t.optString("sha", null);
-            } catch (Exception e) { /* empty repository: no head commit yet */ }
+            } catch (Exception e) {
+                // Empty repository: the Git Data API (blobs/trees/commits/refs) refuses to
+                // touch it (409 "Git Repository is empty"), so create the first commit
+                // through the Contents API, then chain the real upload onto it.
+                bootstrapped = true;
+                gh(token, "PUT", "https://api.github.com/repos/" + owner + "/" + repo + "/contents/.gitly-init",
+                        new org.json.JSONObject()
+                                .put("message", "Initialize repository")
+                                .put("content", "Cg==")
+                                .put("branch", branch).toString());
+                org.json.JSONObject ref = gh(token, "GET", "https://api.github.com/repos/" + owner + "/" + repo
+                        + "/git/ref/heads/" + branch, null);
+                parentSha = ref.getJSONObject("object").getString("sha");
+            }
+            org.json.JSONObject pc = gh(token, "GET", "https://api.github.com/repos/" + owner + "/" + repo
+                    + "/git/commits/" + parentSha, null);
+            org.json.JSONObject t = pc.optJSONObject("tree");
+            if (t != null) baseTree = t.optString("sha", null);
 
             org.json.JSONArray entries = new org.json.JSONArray();
             int total = sc.uris.size();
@@ -509,6 +530,15 @@ public class MainActivity extends Activity {
             if (ok == 0) {
                 evalJs(resultJs(job, 0, fail, errors));
                 return;
+            }
+            // If we bootstrapped an empty repo, remove the marker in the real commit,
+            // unless the upload itself happens to contain a file with that name.
+            if (bootstrapped && !containsPath(sc, dir, ".gitly-init")) {
+                entries.put(new org.json.JSONObject()
+                        .put("path", ".gitly-init")
+                        .put("mode", "100644")
+                        .put("type", "blob")
+                        .put("sha", org.json.JSONObject.NULL));
             }
             evalJs("window.__folderStage && window.__folderStage(" + job + ","
                     + org.json.JSONObject.quote(fail > 0 ? "Committing the " + ok + " files that made it…" : "Creating commit…") + ")");
@@ -713,6 +743,26 @@ public class MainActivity extends Activity {
         });
     }
 
+        /** The app's real versionName straight from the package manager,
+         *  so the web UI never shows a stale installed version. */
+        @JavascriptInterface
+        public String appVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) { return ""; }
+        }
+
+        /** When this app was last installed or updated (epoch ms). Any release
+         *  published on GitHub after this moment is an update this device
+         *  does not have yet - no version numbers needed. */
+        @JavascriptInterface
+        public long appInstallTime() {
+            try {
+                android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                return pi.lastUpdateTime > 0 ? pi.lastUpdateTime : pi.firstInstallTime;
+            } catch (Exception e) { return 0; }
+        }
+
         /** Posts a system notification, e.g. when an upload completes. */
         @JavascriptInterface
         public void notify(final String title, final String text) {
@@ -798,6 +848,159 @@ public class MainActivity extends Activity {
                 if (dm != null) dm.enqueue(req);
             } catch (Exception ignored) {
             }
+        }
+
+        /** Fetches any media URL natively and hands the WebView a data: URI
+         *  (fallback for images/videos the WebView cannot load itself). */
+        @JavascriptInterface
+        public void fetchMedia(final String url) {
+            if (url == null || url.isEmpty()) return;
+            new Thread(new Runnable() { @Override public void run() {
+                try {
+                    java.net.URL u = new java.net.URL(url);
+                    javax.net.ssl.HttpsURLConnection c = (javax.net.ssl.HttpsURLConnection) u.openConnection();
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36");
+                    c.setConnectTimeout(12000);
+                    c.setReadTimeout(25000);
+                    int code = c.getResponseCode();
+                    if (code != 200) {
+                        evalJs("window.__mediaFetched&&__mediaFetched(" + org.json.JSONObject.quote(url) + ",false,'')");
+                        return;
+                    }
+                    String mime = c.getContentType();
+                    if (mime == null || mime.isEmpty() || mime.contains("text/html")) mime = "application/octet-stream";
+                    if (mime.contains(";")) mime = mime.split(";")[0].trim();
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    java.io.InputStream in = c.getInputStream();
+                    byte[] b = new byte[16384]; int r;
+                    while ((r = in.read(b)) > 0 && bo.size() < 9 * 1024 * 1024) bo.write(b, 0, r);
+                    in.close();
+                    c.disconnect();
+                    String b64 = android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP);
+                    evalJs("window.__mediaFetched&&__mediaFetched(" + org.json.JSONObject.quote(url) + ",true," +
+                            org.json.JSONObject.quote("data:" + mime + ";base64," + b64) + ")");
+                } catch (Exception e) {
+                    evalJs("window.__mediaFetched&&__mediaFetched(" + org.json.JSONObject.quote(url) + ",false,'')");
+                }
+            }}).start();
+        }
+
+        /* ===== GitHub OAuth device flow (no client secret needed) ===== */
+        private String oauthPost(String urlS, String body) throws Exception {
+            java.net.URL u = new java.net.URL(urlS);
+            javax.net.ssl.HttpsURLConnection c = (javax.net.ssl.HttpsURLConnection) u.openConnection();
+            c.setRequestMethod("POST");
+            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            c.setRequestProperty("Accept", "application/json");
+            c.setRequestProperty("User-Agent", "OneGit");
+            c.setDoOutput(true);
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(20000);
+            java.io.OutputStream os = c.getOutputStream();
+            os.write(body.getBytes("UTF-8"));
+            os.close();
+            int code = c.getResponseCode();
+            String resp = readAll(code >= 400 ? c.getErrorStream() : c.getInputStream());
+            if (code != 200) throw new Exception("HTTP " + code);
+            return resp;
+        }
+
+        /** Starts a GitHub device sign-in: returns device_code + user_code to the page. */
+        @JavascriptInterface
+        public void oauthStart(final String scope) {
+            new Thread(new Runnable() { @Override public void run() {
+                try {
+                    String b = "client_id=" + java.net.URLEncoder.encode("Ov23liY2f5QBeO8CywWt", "UTF-8") +
+                            "&scope=" + java.net.URLEncoder.encode(scope == null ? "" : scope, "UTF-8");
+                    String resp = oauthPost("https://github.com/login/device/code", b);
+                    evalJs("window.__oauthStart&&__oauthStart(true," + org.json.JSONObject.quote(resp) + ")");
+                } catch (Exception e) {
+                    evalJs("window.__oauthStart&&__oauthStart(false," + org.json.JSONObject.quote(ghErr(e)) + ")");
+                }
+            }}).start();
+        }
+
+        /** Polls GitHub for the OAuth device token once; the page decides to keep polling. */
+        @JavascriptInterface
+        public void oauthPoll(final String deviceCode) {
+            new Thread(new Runnable() { @Override public void run() {
+                try {
+                    String b = "client_id=" + java.net.URLEncoder.encode("Ov23liY2f5QBeO8CywWt", "UTF-8") +
+                            "&device_code=" + java.net.URLEncoder.encode(deviceCode == null ? "" : deviceCode, "UTF-8") +
+                            "&grant_type=" + java.net.URLEncoder.encode("urn:ietf:params:oauth:grant-type:device_code", "UTF-8");
+                    String resp = oauthPost("https://github.com/login/oauth/access_token", b);
+                    evalJs("window.__oauthPoll&&__oauthPoll(true," + org.json.JSONObject.quote(resp) + ")");
+                } catch (Exception e) {
+                    evalJs("window.__oauthPoll&&__oauthPoll(false," + org.json.JSONObject.quote(ghErr(e)) + ")");
+                }
+            }}).start();
+        }
+
+        /** Downloads a repo file through api.github.com (so it works even when
+         *  raw.githubusercontent.com is unreachable) and saves it to Downloads. */
+        @JavascriptInterface
+        public void apiDownload(final String owner, final String repo, final String path, final String name) {
+            final String token = getSharedPreferences("onegit", MODE_PRIVATE).getString("token", "");
+            final String safeName = (name == null || name.isEmpty() ? "file" : name)
+                    .replaceAll("[^A-Za-z0-9 ._()-]", "_");
+            new Thread(new Runnable() { @Override public void run() {
+                try {
+                    String enc = java.net.URLEncoder.encode(path == null ? "" : path, "UTF-8").replace("%2F", "/");
+                    java.net.URL u = new java.net.URL("https://api.github.com/repos/" + owner + "/" + repo
+                            + "/contents/" + enc + "?ref=HEAD");
+                    javax.net.ssl.HttpsURLConnection c = (javax.net.ssl.HttpsURLConnection) u.openConnection();
+                    c.setRequestProperty("Accept", "application/vnd.github.raw");
+                    c.setRequestProperty("User-Agent", "OneGit");
+                    if (token != null && !token.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + token);
+                    c.setConnectTimeout(15000);
+                    c.setReadTimeout(60000);
+                    int code = c.getResponseCode();
+                    if (code != 200) {
+                        evalJs("window.toast&&toast('Download failed - HTTP " + code + "')");
+                        return;
+                    }
+                    long len = c.getContentLengthLong();
+                    if (len > 64L * 1024 * 1024) { evalJs("window.toast&&toast('File is too large to download in-app')"); return; }
+                    String mime = c.getContentType();
+                    if (mime == null || mime.isEmpty()) mime = "application/octet-stream";
+                    if (mime.contains(";")) mime = mime.split(";")[0].trim();
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    java.io.InputStream in = c.getInputStream();
+                    byte[] b = new byte[16384]; int r;
+                    while ((r = in.read(b)) > 0) bo.write(b, 0, r);
+                    in.close();
+                    c.disconnect();
+                    byte[] data = bo.toByteArray();
+                    if (data.length == 0) { evalJs("window.toast&&toast('Download failed - empty file')"); return; }
+                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                        android.content.ContentValues cv = new android.content.ContentValues();
+                        cv.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safeName);
+                        cv.put(android.provider.MediaStore.Downloads.MIME_TYPE, mime);
+                        android.net.Uri uri = getContentResolver().insert(
+                                android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                        if (uri == null) throw new IllegalStateException("MediaStore refused the download");
+                        java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+                        out.write(data);
+                        out.close();
+                    } else {
+                        java.io.File f = new java.io.File(getExternalFilesDir(
+                                android.os.Environment.DIRECTORY_DOWNLOADS), safeName);
+                        java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
+                        fo.write(data);
+                        fo.close();
+                        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                        if (dm != null) {
+                            try {
+                                dm.addCompletedDownload(safeName, "Gitly", false, mime,
+                                        f.getAbsolutePath(), data.length, true);
+                            } catch (Exception ignored) { }
+                        }
+                    }
+                    evalJs("window.toast&&toast('Saved " + safeName + " to Downloads')");
+                } catch (Exception e) {
+                    evalJs("window.toast&&toast('Download failed - " + ghErr(e) + "')");
+                }
+            }}).start();
         }
 
         /** Native clipboard copy (works even where the web clipboard API does not). */

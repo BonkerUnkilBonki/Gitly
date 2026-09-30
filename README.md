@@ -1,3 +1,261 @@
+## What's new in v2.77 - updater pointed at the renamed repo
+- IMPORTANT: the GitHub "Continue with GitHub" sign-in arrived in
+  v2.75, but it only reached users who installed the APK directly.
+  The public update repo's latest release was still v2.69, so
+  everyone who updated in-app stayed on v2.69 and saw no sign-in
+  button. Publish this APK as release v2.77 on the
+  BonkerUnkilBonki/Gitly-Update repo so all users finally receive
+  it through the in-app updater.
+- The updater now targets BonkerUnkilBonki/Gitly-Update directly
+  (the repo was renamed from OneGit) instead of relying on
+  GitHub's redirect.
+
+## What's new in v2.76 - version visible on the login screen
+- The login screen now shows the app version (e.g. "Gitly v2.76")
+  under the tagline, so it is easy to tell whether an installation
+  is up to date. The GitHub OAuth "Continue with GitHub" button
+  arrived in v2.75 - anyone who does not see it is on an older
+  build and needs to update (in-app Settings, App updates, or
+  download the latest Gitly.apk from the releases).
+
+## What's new in v2.75 - GitHub OAuth sign-in
+- Sign in with your GitHub account, no token pasting: "Continue
+  with GitHub" on the login screen starts GitHub's official OAuth
+  device flow. The app shows a one-time code (auto-copied), you
+  approve it at github.com/login/device, and Gitly logs you in -
+  automatically once approved, or via the "Continue" button.
+  The pending sign-in survives closing the app and can be
+  finished from the login screen within the 15-minute code
+  lifetime. Scopes requested: repo, read:user, notifications,
+  gist - identical to the token login. Personal access token
+  login remains available as a fallback. The client secret is
+  NOT stored in the app (the device flow does not need it).
+
+## What's new in v2.74 - full repo & GitHub settings
+- New Repository settings screen (Settings button next to Edit
+  repository on your own repos), mirroring GitHub's repo settings:
+  General (rename, description, homepage, default branch),
+  Features (Issues, Wiki, Projects, Discussions, Template,
+  Private), Pull requests (merge methods, auto-merge, auto-delete
+  branches, allow forking), Collaborators (add/remove with
+  permission level), Branches (make default, delete), Tags
+  (delete), Webhooks (add with push/everything events, delete),
+  Deploy keys (add with read-only option, delete), and a Danger
+  zone (archive toggle, delete repository).
+- New GitHub account section in app Settings: Edit profile
+  (name, bio, company, location, website), Email addresses
+  (list, add, remove - needs user:email scope on your token),
+  and Authorized applications (list, revoke access).
+
+## What's new in v2.73 - write actions only on your own repos
+- Repos you do not have write access to no longer show owner
+  controls: the Files screen hides Add file / Upload files /
+  Upload folder, Releases hides New release, per-release
+  Upload files / Edit release, and asset delete buttons, and
+  the file view hides Edit / Delete. Access is checked per
+  repo via GitHub's permissions (owner or collaborator), so
+  your own repos and repos you collaborate on keep every
+  control, and everything else is read-only - Star, Watch,
+  Fork, New issue and downloads still work everywhere.
+
+## What's new in v2.72 - GitHub-style sort dropdown
+- The sort control is now a "Sort: ..." dropdown exactly like
+  GitHub's, opening a bottom sheet with a checkmark on the
+  active option. Repository sorting now offers GitHub's full
+  option set: Best match, Most stars, Fewest stars, Most forks,
+  Fewest forks, Recently updated, Least recently updated, plus
+  Name A-Z. Searches and Discover are sorted server-side by the
+  selected option, so results reorder across all pages.
+  Commits and Issues screens use the same dropdown.
+
+## What's new in v2.71 - sort button highlight fix
+- Tapping a sort option now immediately moves the highlighted
+  pill to the tapped button on every screen (previously the
+  selection highlight stayed put on the Repos list and the
+  global Issues screen even though the sorting itself worked).
+
+## What's new in v2.70 - sort options
+- Sort controls on every major list so you can find things fast:
+  Repositories (Recent, Name, Stars, Forks, Newest repo),
+  repo Commits (Newest, Oldest, Author), the global Commits
+  tab (Newest, Oldest, Repo), and Issues (Updated, Newest,
+  Oldest, Most comments) on both the repo screen and the
+  global Issues screen. Your choice is remembered per screen,
+  sorting applies instantly without refetching on the repos
+  list, and search results sort too.
+
+## What's new in v2.69 - repo tabs fix
+- Fixed the Readme / Files / Commits / Issues tabs on the repo
+  screen doing nothing when tapped: v2.68's in-page-anchor
+  handling was swallowing their navigation. In-page README
+  anchors still smooth-scroll; app routes (#/...) now pass
+  through to the router as they should.
+
+## What's new in v2.68 - complete README compatibility
+- Fixed the last broken README images: badge and stats URLs that
+  contain emoji or non-ASCII text were mangled while unmasking
+  GitHub's camo proxy - they are now correctly percent-encoded,
+  so every badge/card renders.
+- README links now actually work: GitHub marks every link
+  target="_blank" and the WebView silently dropped those taps -
+  that is why clicking badges/panels did nothing. Links now open
+  properly: github.com repo/profile links navigate inside the
+  app, in-page anchors smooth-scroll to their heading (they used
+  to break navigation by hijacking the route), and everything
+  else opens in the browser.
+- Any image or video the WebView still cannot load is retried
+  through a native fetch and swapped in as a data URI.
+- Collapsible README panels (<details>) now animate smoothly
+  open/closed instead of popping, and are styled like cards.
+
+## What's new in v2.67 - full README media support
+- README images fixed for good, both causes found and fixed:
+  GitHub proxies every external README image through
+  camo.githubusercontent.com (blocked on some Indian networks) -
+  those are now unmasked and loaded from the real host directly
+  (stats cards, badges, animated emojis all render again). And
+  in-repo images bigger than 1 MB (the profile "Welcome banner"
+  style banners) were refused by the contents endpoint - they
+  now fall back to the git blobs API, which serves files up to
+  GitHub's 100 MB limit.
+- Attachment links inside READMEs (pdf, txt, log, csv, tsv, json,
+  yaml, rtf, docx, xlsx, pptx, zip, gz, and code files like
+  .c .java .py .js .xml .ipynb ...) are now tap-to-download:
+  they download through api.github.com and save into your
+  Downloads folder, working even where raw.githubusercontent.com
+  is blocked.
+- Embedded videos (mp4, mov, webm) in READMEs now get proper
+  full-width rounded layout, and README images can no longer
+  overflow the screen edge (contribution graphs and wide stats
+  images fit the display now).
+
+## What's new in v2.66 - sheet scroll lock
+- Fixed the page behind a bottom sheet scrolling while you
+  scroll inside it (seen on the ChangeLog sheet over Settings).
+  The page behind is now fully frozen while any sheet is open,
+  and the sheet itself no longer lets scroll gestures pass
+  through at its top and bottom edges.
+
+## What's new in v2.65 - repo rename, glowing glass back buttons
+- Edit repository sheet now has a Repository name field, so you
+  can rename the repo right from the app. After a rename the
+  app jumps to the new repo URL and any pinned shortcut is
+  updated to the new name. Invalid names (spaces, empty, over
+  100 characters) are rejected with a message before anything
+  is sent to GitHub.
+- When Navigation glow is on, the back buttons now carry the
+  same accent-colored glow as the navigation bar.
+- Back buttons keep the frosted glass (blurred, translucent)
+  look of the navigation bar in every theme.
+
+## What's new in v2.64 - ChangeLog button
+- The App updates section in Settings now has a ChangeLog button
+  (always visible, update or not): it opens the text you typed
+  into "Describe this release" for the newest published
+  release - rendered as rich markdown when GitHub returns HTML,
+  plain text otherwise. Repo-stored images in the changelog use
+  the same api.github.com inlining as READMEs, so they load on
+  every network.
+
+## What's new in v2.63 - tag-version update check
+- Update detection now also compares versions again: if the
+  release's TAG carries a newer version than the installed app
+  (v2.64 > 2.63, or a number found in the release name when the
+  tag has none), it always counts as an update. Combined with
+  the any-new-release rule from 2.62, that means: newer tag
+  version OR any release published after your install triggers
+  the update popup, the Settings row with the APK download, and
+  auto-download when enabled. The installed version is read
+  from the Android package, so it is always accurate.
+
+## What's new in v2.62 - releases show as updates, no version math
+- The update check no longer compares version numbers at all.
+  Gitly now remembers when it was installed/updated on this
+  device (from the Android package itself): ANY release you
+  publish on the OneGit releases page after that moment shows
+  as an update - popup card, Settings row and auto-download -
+  whatever the tag or title says. Installing the new APK resets
+  the clock, so you are never nagged about a release you
+  already have. Drafts are ignored; the newest PUBLISHED
+  release is picked from the releases list directly, so it
+  works even without GitHub's "Latest" marker.
+
+## What's new in v2.61 - working update checker
+- The update check was broken twice over. The web UI compared
+  against a hardcoded version string that no longer matched the
+  built app, and it only read the version from the release TAG -
+  a tag like "vStable" with the number only in the release NAME
+  (as in "vStable 2.60") was never detected, so Gitly kept
+  saying "You are on the latest version". The installed version
+  now comes straight from the Android package (it can never go
+  stale again), and the checker reads the number from the tag OR
+  the release name - so v2.60, vStable 2.60 and V2.60 all work.
+
+## What's new in v2.60 - README images on every network
+- Repo-stored README images (welcome banners, stats SVGs) still
+  failed on some devices and networks, because they load from
+  raw.githubusercontent.com - which several ISPs block even while
+  the rest of GitHub works. Gitly now re-fetches those images
+  through api.github.com (the same authenticated channel every
+  other feature uses) and renders them from memory, so they work
+  on any network - private repositories included. If that fetch
+  ever fails, the direct URL remains as fallback. Applies to repo
+  READMEs, profile READMEs, issues and comments.
+
+## What's new in v2.59 - adaptive header titles
+- The big header title now scales itself down (34px to a 22px
+  floor) so long names like the Home greeting with your handle
+  fit on one line instead of breaking mid-word with a dangling
+  letter. Titles that still cannot fit wrap cleanly at word
+  boundaries, and the size re-fits on rotation.
+
+## What's new in v2.58 - header spacing
+- Page titles no longer sit flush against the back button (2px
+  gap -> 10px), subtitles get breathing room below the header
+  row, and the Profile README screen shows the @handle as a
+  proper big title instead of a cramped subtitle under the
+  back pill.
+
+## What's new in v2.57 - pill back buttons
+- The back buttons on every detail screen (big header and the
+  collapsed top bar) now sit in a frosted circular pill, matching
+  the bottom navigation bar - with proper light, dark and pitch
+  black variants.
+
+## What's new in v2.56 - cleaner Profile README header
+- The big "Profile README" title text no longer sits at the top of
+  the profile README screen - the header now shows just the
+  @handle. The small top bar still says Profile README while
+  scrolling, so you always know where you are.
+
+## What's new in v2.55 - fixed unreadable active-button text
+- With a light accent color (custom or dynamic Material You), the
+  Starred / Watching buttons on a repository and the active Follow
+  button showed white text on a light accent background - almost
+  invisible. They now use the accent-aware text color the rest of
+  the app already uses, switching to dark text on light accents.
+
+## What's new in v2.54 - fixed README images
+- Images stored inside a repository (welcome banners, stats SVGs,
+  screenshots - anything referenced with a relative path like
+  ./assets/banner.png) were broken in repo READMEs, profile
+  READMEs, issues and comments: they were resolved against
+  github.com itself instead of the repository, so every one of
+  them 404'd. Gitly now resolves them against the repository's
+  raw files, so they render everywhere. Links inside READMEs
+  now open the right file pages too, and in-page anchors no
+  longer get mangled.
+
+## What's new in v2.53 - fixed uploads into empty repositories
+- Uploading a folder to a repository with no commits failed with
+  "HTTP 409 - Git Repository is empty" for every file: GitHub's
+  Git Data API refuses to touch a repository that has no commits
+  yet. Gitly now bootstraps the repository first through the
+  Contents API (a tiny invisible marker commit), then chains the
+  real upload onto it and removes the marker again in the same
+  push - so an empty repo ends up with exactly the files you
+  uploaded, in one clean commit on top of the bootstrap.
+
 ## What's new in v2.52 - big, complete folder uploads
 - Folder and multi-file uploads now run natively and stream every
   file straight to GitHub: per-file limit lifted from 10 MB to

@@ -101,10 +101,18 @@ body.dark .card,body.pitch .card{border:1px solid var(--divider)}
 .btn.primary:active{box-shadow:0 0 30px var(--glow)}
 .btn.ghost{background:var(--seg);color:var(--text)}
 .btn.danger{background:rgba(229,57,53,.12);color:var(--danger)}
-.btn.follow.on{background:var(--accent);color:#fff;box-shadow:0 0 18px var(--glow)}
+.btn.follow.on{background:var(--accent);color:var(--accentText,#fff);box-shadow:0 0 18px var(--glow)}
 .btnblock{width:100%}
 .iconbtn{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);flex-shrink:0}
 .iconbtn svg{width:24px;height:24px}
+/* back buttons get the same frosted circular pill as the navigation bar */
+#backBig,#backApp{background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);border:1px solid rgba(0,0,0,.06);box-shadow:0 6px 22px rgba(0,0,0,.14)}
+body.dark #backBig,body.dark #backApp{background:rgba(26,27,29,.76);border-color:rgba(255,255,255,.07);box-shadow:0 6px 22px rgba(0,0,0,.45)}
+body.pitch #backBig,body.pitch #backApp{background:rgba(8,8,8,.84);border-color:rgba(255,255,255,.05);box-shadow:0 6px 22px rgba(0,0,0,.9)}
+/* v2.65: with navigation glow on, the back buttons glow like the navbar */
+body.navglow #backBig,body.navglow #backApp{box-shadow:0 6px 22px rgba(0,0,0,.14),0 0 26px var(--glow)}
+body.dark.navglow #backBig,body.dark.navglow #backApp{box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 26px var(--glow)}
+body.pitch.navglow #backBig,body.pitch.navglow #backApp{box-shadow:0 6px 22px rgba(0,0,0,.9),0 0 26px var(--glow)}
 
 /* ---------- login ---------- */
 #login{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:50}
@@ -130,9 +138,9 @@ body.dark .card,body.pitch .card{border:1px solid var(--divider)}
 #appbarTitle{font-weight:600;font-size:16px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #scroller{height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #pagehead{padding:14px 18px 12px}
-.phrow{display:flex;align-items:center;gap:2px}
-#bigTitle{font-size:34px;font-weight:700;margin:0;letter-spacing:-.5px;line-height:1.25;word-break:break-word;flex:1;min-width:0}
-#bigSub{margin:3px 2px 0;font-size:13.5px;color:var(--text2)}
+.phrow{display:flex;align-items:center;gap:10px}
+#bigTitle{font-size:34px;font-weight:700;margin:0;letter-spacing:-.5px;line-height:1.25;overflow-wrap:anywhere;flex:1;min-width:0}
+#bigSub{margin:6px 4px 0;font-size:13.5px;color:var(--text2)}
 #view{padding:6px 12px 96px}
 
 /* ---------- GPU compositing fixes: no white corner artifacts ---------- */
@@ -311,7 +319,11 @@ a.segb.on{color:var(--accent)}
 .md pre{background:var(--bg);padding:14px 16px;border-radius:18px;overflow-x:auto;font-size:12.5px;line-height:1.5;margin:.8em 0}
 .md code{background:var(--chip);border-radius:7px;padding:1px 6px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
 .md pre code{background:none;padding:0;font-size:inherit}
-.md img{border-radius:14px;margin:8px 0}
+.md img{border-radius:14px;margin:8px 0;max-width:100%;height:auto}
+.md video{width:100%;max-height:70vh;border-radius:14px;background:#000;margin:8px 0}
+.md details{margin:10px 0;border:1px solid var(--divider);border-radius:14px;padding:4px 14px}
+.md summary{cursor:pointer;font-weight:600;padding:8px 0;color:var(--text)}
+.md summary::marker{color:var(--accent)}
 .md table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%;margin:.8em 0}
 .md th,.md td{border:1px solid var(--divider);padding:6px 10px;font-size:13px}
 .md blockquote{margin:.8em 0;padding:2px 14px;border-left:3px solid var(--divider);color:var(--text2)}
@@ -319,7 +331,9 @@ a.segb.on{color:var(--accent)}
 
 /* ---------- sheet ---------- */
 #sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:flex;align-items:flex-end}
-.sheetcard{background:var(--card);width:100%;border-radius:36px 36px 0 0;padding:14px 16px 30px;max-height:86vh;overflow:auto;animation:sheetUp .32s cubic-bezier(.2,.8,.25,1)}
+.sheetcard{background:var(--card);width:100%;border-radius:36px 36px 0 0;padding:14px 16px 30px;max-height:86vh;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;animation:sheetUp .32s cubic-bezier(.2,.8,.25,1)}
+/* v2.66: while a sheet is open the page behind it cannot scroll */
+body.sheetopen #scroller{overflow:hidden}
 .sheethead{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 14px;gap:10px}
 .sheethead b{font-size:15px;word-break:break-all}
 .filepre{background:var(--bg);padding:14px;border-radius:18px;font-size:12px;line-height:1.5;overflow:auto;max-height:66vh;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--text)}
@@ -338,7 +352,7 @@ body.dark .toast,body.pitch .toast{background:#E8E8E8;color:#222}
 .actionrow{display:flex;gap:8px}
 .actionrow .btn{flex:1;min-height:42px;padding:0 6px;font-size:13px;border-radius:21px;gap:6px}
 .actionrow .btn svg{width:16px;height:16px;flex-shrink:0}
-.actionrow .btn.on{background:var(--accent);color:#fff;box-shadow:0 0 16px var(--glow)}
+.actionrow .btn.on{background:var(--accent);color:var(--accentText,#fff);box-shadow:0 0 16px var(--glow)}
 .actionrow .btn.on svg{fill:currentColor}
 .langbar{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px}
 .langbar span{display:block;min-width:2px}
